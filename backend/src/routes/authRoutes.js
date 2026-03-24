@@ -164,8 +164,33 @@ const refresh = asyncHandler(async (req, res) => {
 	if (!stored) {
 		return res.status(401).json({ success: false, data: null, message: "Invalid refresh token" });
 	}
-	const payload = verifyRefreshToken(refreshToken);
-	const accessToken = signAccessToken(payload.sub, payload.role);
+
+	if (stored.expiresAt && stored.expiresAt <= new Date()) {
+		stored.revoked = true;
+		await stored.save();
+		return res.status(401).json({ success: false, data: null, message: "Refresh token expired" });
+	}
+
+	let payload;
+	try {
+		payload = verifyRefreshToken(refreshToken);
+	} catch (err) {
+		if (err && (err.name === "TokenExpiredError" || err.name === "JsonWebTokenError" || err.name === "NotBeforeError")) {
+			stored.revoked = true;
+			await stored.save();
+			return res.status(401).json({ success: false, data: null, message: "Invalid or expired refresh token" });
+		}
+		throw err;
+	}
+
+	const user = await User.findById(payload.sub).select("role status").lean();
+	if (!user || user.status !== "active") {
+		stored.revoked = true;
+		await stored.save();
+		return res.status(401).json({ success: false, data: null, message: "Invalid refresh token" });
+	}
+
+	const accessToken = signAccessToken(payload.sub, user.role);
 	success(res, { accessToken });
 });
 

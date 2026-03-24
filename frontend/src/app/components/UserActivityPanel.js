@@ -92,7 +92,18 @@ export function UserActivityPanel({ open, onClose, userId }) {
   }, [history?.activityTimeline]);
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 760 } } }}>
+    <Drawer
+      anchor="right"
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          width: { xs: '100%', sm: 760 },
+          mt: { xs: '56px', sm: '64px' },
+          height: { xs: 'calc(100% - 56px)', sm: 'calc(100% - 64px)' },
+        },
+      }}
+    >
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
           User Activity History
