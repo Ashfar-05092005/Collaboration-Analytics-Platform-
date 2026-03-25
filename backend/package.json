@@ -7,8 +7,8 @@
   },
   "main": "src/app.js",
   "scripts": {
-    "start": "node src/app.js",
-    "dev": "nodemon src/app.js",
+    "start": "node ../scripts/check-node-version.js && node src/app.js",
+    "dev": "node ../scripts/check-node-version.js && nodemon src/app.js",
     "backfill:user-codes": "node scripts/backfill_user_codes.js"
   },
   "dependencies": {
