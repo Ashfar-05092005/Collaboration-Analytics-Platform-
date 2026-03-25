@@ -1,7 +1,6 @@
 const express = require("express");
 const { body } = require("express-validator");
 const { Project } = require("../models/Project");
-const { Task } = require("../models/Task");
 const { User } = require("../models/User");
 const { Notification } = require("../models/Notification");
 const { ActivityLog } = require("../models/ActivityLog");
@@ -29,53 +28,6 @@ const projectAccessFilter = (req, projectId) => {
 	return { _id: projectId };
 };
 
-const calculateProjectProgressMap = async (projectIds) => {
-	if (!projectIds.length) return new Map();
-
-	const stats = await Task.aggregate([
-		{ $match: { projectId: { $in: projectIds } } },
-		{
-			$group: {
-				_id: "$projectId",
-				total: { $sum: 1 },
-				completed: {
-					$sum: {
-						$cond: [{ $eq: ["$status", "completed"] }, 1, 0],
-					},
-				},
-			},
-		},
-	]);
-
-	const progressMap = new Map();
-	stats.forEach((entry) => {
-		const total = entry.total || 0;
-		const completed = entry.completed || 0;
-		const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-		progressMap.set(String(entry._id), progress);
-	});
-
-	return progressMap;
-};
-
-const withComputedProjectProgress = async (projects) => {
-	const safeProjects = Array.isArray(projects) ? projects : [];
-	const projectIds = safeProjects
-		.map((project) => project?._id)
-		.filter(Boolean);
-
-	if (!projectIds.length) return safeProjects;
-
-	const progressMap = await calculateProjectProgressMap(projectIds);
-
-	return safeProjects.map((project) => ({
-		...project,
-		progress: progressMap.has(String(project._id))
-			? progressMap.get(String(project._id))
-			: Number(project.progress || 0),
-	}));
-};
-
 const createProject = asyncHandler(async (req, res) => {
 	const project = await Project.create({ ...req.body, createdBy: req.user._id });
 	await ActivityLog.create({
@@ -101,15 +53,13 @@ const listProjects = asyncHandler(async (req, res) => {
 			.lean(),
 		Project.countDocuments(filter),
 	]);
-	const projectsWithProgress = await withComputedProjectProgress(projects);
-	success(res, { items: projectsWithProgress, page, limit, total });
+	success(res, { items: projects, page, limit, total });
 });
 
 const getProject = asyncHandler(async (req, res) => {
 	const project = await Project.findOne(projectAccessFilter(req, req.params.id)).lean();
 	if (!project) return res.status(404).json({ success: false, data: null, message: "Not found" });
-	const [projectWithProgress] = await withComputedProjectProgress([project]);
-	success(res, projectWithProgress);
+	success(res, project);
 });
 
 const updateProject = asyncHandler(async (req, res) => {

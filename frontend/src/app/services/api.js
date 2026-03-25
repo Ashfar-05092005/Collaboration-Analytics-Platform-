@@ -1,14 +1,4 @@
-const normalizeBaseUrl = (url) => String(url || "").trim().replace(/\/+$/, "");
-
-const API_BASE = normalizeBaseUrl(process.env.REACT_APP_API_URL || "");
-
-if (typeof window !== "undefined") {
-  if (API_BASE) {
-    console.info("[api] Using API base URL:", API_BASE);
-  } else {
-    console.warn("[api] REACT_APP_API_URL is not set; using relative API paths.");
-  }
-}
+const API_BASE = process.env.REACT_APP_API_URL || "";
 
 const refreshAccessToken = async () => {
   const refreshToken = localStorage.getItem("refreshToken");
@@ -198,7 +188,6 @@ export const transferPoints = (payload) => api.post("/api/points/transfer", payl
 export const fetchAnalyticsSummary = () => api.get("/api/analytics/summary");
 export const fetchTeamProductivity = () => api.get("/api/analytics/team-productivity");
 export const fetchProjectProgress = () => api.get("/api/analytics/project-progress");
-export const fetchAnalyticsDashboard = () => api.get("/api/analytics/dashboard");
 
 export default api;
 

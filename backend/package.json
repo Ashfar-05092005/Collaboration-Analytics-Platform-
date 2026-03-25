@@ -9,7 +9,10 @@
   "scripts": {
     "start": "node ../scripts/check-node-version.js && node src/app.js",
     "dev": "node ../scripts/check-node-version.js && nodemon src/app.js",
-    "backfill:user-codes": "node scripts/backfill_user_codes.js"
+    "seed:admin": "node src/seedAdmin.js",
+    "seed:dummy": "node src/seedDummyUsers.js",
+    "backfill:user-codes": "node scripts/backfill_user_codes.js",
+    "seed:bulk-users": "node scripts/seed_bulk_users.js"
   },
   "dependencies": {
     "bcryptjs": "2.4.3",
