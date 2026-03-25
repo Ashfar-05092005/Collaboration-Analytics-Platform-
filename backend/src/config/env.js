@@ -26,14 +26,28 @@ const parseCorsOrigins = (value) => {
 
 const logMissingEnvWarnings = (env) => {
   const required = [
-    { key: "MONGO_URI", value: env.MONGO_URI },
-    { key: "JWT_SECRET/JWT_ACCESS_SECRET", value: env.JWT_ACCESS_SECRET },
-    { key: "JWT_REFRESH_SECRET", value: env.JWT_REFRESH_SECRET },
+    { key: "MONGO_URI", value: env.MONGO_URI, critical: true },
+    { key: "JWT_ACCESS_SECRET/JWT_SECRET", value: env.JWT_ACCESS_SECRET, critical: true },
+    { key: "JWT_REFRESH_SECRET", value: env.JWT_REFRESH_SECRET, critical: false },
   ];
 
-  const missing = required.filter((entry) => !entry.value).map((entry) => entry.key);
+  const missing = required.filter((entry) => !entry.value);
   if (missing.length) {
-    console.warn(`[env] Missing environment variables: ${missing.join(", ")}`);
+    const criticalMissing = missing.filter((m) => m.critical);
+    const warnings = missing.filter((m) => !m.critical);
+
+    if (criticalMissing.length) {
+      console.warn(
+        `[env] ⚠ CRITICAL: Missing required variables: ${criticalMissing.map((m) => m.key).join(", ")}`
+      );
+    }
+    if (warnings.length) {
+      console.warn(
+        `[env] ⚠ WARNING: Missing optional variables: ${warnings.map((m) => m.key).join(", ")}`
+      );
+    }
+  } else {
+    console.log("[env] ✓ All required environment variables are set");
   }
 };
 
@@ -46,11 +60,15 @@ const env = {
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
-  BCRYPT_SALT_ROUNDS: process.env.BCRYPT_SALT_ROUNDS,
+  BCRYPT_SALT_ROUNDS: process.env.BCRYPT_SALT_ROUNDS || 10,
   CORS_ORIGIN: parseCorsOrigins(process.env.CORS_ORIGIN),
 };
 
 logMissingEnvWarnings(env);
+
+if (env.NODE_ENV === "production") {
+  console.log("[env] Production mode enabled");
+}
 
 module.exports = { env };
 

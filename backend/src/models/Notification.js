@@ -12,7 +12,10 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Indexes for efficient querying
 notificationSchema.index({ user: 1, read: 1, createdAt: -1 });
+notificationSchema.index({ user: 1, createdAt: -1 });
+notificationSchema.index({ read: 1, createdAt: -1 });
 
 const Notification = mongoose.model("Notification", notificationSchema);
 
