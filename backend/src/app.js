@@ -17,13 +17,20 @@ const pointsRoutes = require("./routes/pointsRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const { errorHandler } = require("./middlewares/error");
 
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
+});
+
 const app = express();
+const PORT = process.env.PORT || 5000;
 
 const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, "").toLowerCase();
 
 app.set("trust proxy", 1);
-
-connectDB();
 
 app.use(helmet());
 app.use(
@@ -56,6 +63,10 @@ app.use(
   })
 );
 
+app.get("/", (req, res) => {
+  res.send("Server running");
+});
+
 app.get("/health", (req, res) => {
   res.json({ success: true, data: { status: "ok" } });
 });
@@ -77,7 +88,22 @@ app.use("/api/points", pointsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use(errorHandler);
 
-app.listen(env.PORT, () => {
-  console.log(`Backend running on port ${env.PORT}`);
-});
+const startServer = async () => {
+  try {
+    console.log("[startup] Starting backend server...");
+    await connectDB();
+
+    const server = app.listen(PORT, () => {
+      console.log(`[startup] Backend running on port ${PORT}`);
+    });
+
+    server.on("error", (error) => {
+      console.error("[startup] Server failed to start:", error);
+    });
+  } catch (error) {
+    console.error("[startup] Critical startup failure:", error);
+  }
+};
+
+startServer();
 
