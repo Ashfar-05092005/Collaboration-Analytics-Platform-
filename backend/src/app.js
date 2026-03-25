@@ -1,10 +1,12 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const compression = require("compression");
 const rateLimit = require("express-rate-limit");
 const { connectDB } = require("./config/db");
-const { env } = require("./config/env");
+const { env, validateRequiredEnv } = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const teamRoutes = require("./routes/teamRoutes");
@@ -18,12 +20,17 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const { errorHandler } = require("./middlewares/error");
 
 const app = express();
+const PORT = process.env.PORT || 5000;
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+process.on("uncaughtException", (err) => console.error("Uncaught Exception:", err));
+process.on("unhandledRejection", (err) => console.error("Unhandled Rejection:", err));
 
 app.set("trust proxy", 1);
 
-connectDB();
-
 app.use(helmet());
+app.use(compression({ level: 6, threshold: 1024 }));
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -49,6 +56,8 @@ app.use(
   })
 );
 
+app.get("/", (req, res) => res.send("Server running"));
+
 app.get("/health", (req, res) => {
   res.json({ success: true, data: { status: "ok" } });
 });
@@ -56,6 +65,20 @@ app.get("/health", (req, res) => {
 // Prevent noisy 404s for browser favicon requests
 app.get("/favicon.ico", (req, res) => {
   res.status(204).end();
+});
+
+app.param("id", (req, res, next, value) => {
+  if (!mongoose.isValidObjectId(value)) {
+    return res.status(400).json({ success: false, data: null, message: "Invalid id" });
+  }
+  return next();
+});
+
+app.param("memberId", (req, res, next, value) => {
+  if (!mongoose.isValidObjectId(value)) {
+    return res.status(400).json({ success: false, data: null, message: "Invalid memberId" });
+  }
+  return next();
 });
 
 app.use("/api/auth", authRoutes);
@@ -70,7 +93,28 @@ app.use("/api/points", pointsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use(errorHandler);
 
-app.listen(env.PORT, () => {
-  console.log(`Backend running on port ${env.PORT}`);
-});
+const startServer = async () => {
+  try {
+    validateRequiredEnv();
+
+    let dbConnected = await connectDB();
+    while (!dbConnected) {
+      console.warn("[startup] Waiting for MongoDB before starting HTTP server...");
+      await wait(5000);
+      dbConnected = await connectDB();
+    }
+
+    const server = app.listen(PORT, () => {
+      console.log(`[startup] Server started on port ${PORT}`);
+    });
+
+    server.on("error", (error) => {
+      console.error("[startup] Server listen error:", error.message || error);
+    });
+  } catch (error) {
+    console.error("[startup] Critical startup failure:", error.message || error);
+  }
+};
+
+startServer();
 
