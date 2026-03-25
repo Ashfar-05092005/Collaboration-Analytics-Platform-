@@ -1,4 +1,5 @@
-const API_BASE = process.env.REACT_APP_API_URL || "";
+
+const API_BASE = String(process.env.REACT_APP_API_URL || DEPLOYED_API_URL).trim().replace(/\/+$/, "");
 
 const refreshAccessToken = async () => {
   const refreshToken = localStorage.getItem("refreshToken");

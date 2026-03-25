@@ -23,6 +23,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, "").toLowerCase();
 
 process.on("uncaughtException", (err) => console.error("Uncaught Exception:", err));
 process.on("unhandledRejection", (err) => console.error("Unhandled Rejection:", err));
@@ -36,7 +37,7 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       const allowedOrigins = Array.isArray(env.CORS_ORIGIN) ? env.CORS_ORIGIN : [env.CORS_ORIGIN];
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(normalizeOrigin(origin))) {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS"));
