@@ -3,7 +3,6 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
-const compression = require("compression");
 const { connectDB } = require("./config/db");
 const { env } = require("./config/env");
 const authRoutes = require("./routes/authRoutes");
@@ -18,15 +17,12 @@ const pointsRoutes = require("./routes/pointsRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const { errorHandler } = require("./middlewares/error");
 
-// Global error handlers
 process.on("uncaughtException", (err) => {
-  console.error("[process] Uncaught Exception:", err);
-  // Continue running - don't exit unless critical
+  console.error("Uncaught Exception:", err);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[process] Unhandled Rejection at:", promise, "reason:", reason);
-  // Continue running - don't exit unless critical
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
 });
 
 const app = express();
@@ -36,13 +32,7 @@ const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, 
 
 app.set("trust proxy", 1);
 
-// Security middleware
 app.use(helmet());
-
-// Compression middleware for API responses
-app.use(compression({ level: 6, threshold: 1024 }));
-
-// CORS configuration
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -61,46 +51,24 @@ app.use(
     optionsSuccessStatus: 204,
   })
 );
-
-// Request parsing middleware with limits
 app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ limit: "1mb", extended: true }));
-
-// Logging middleware
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
-// Request timeout middleware (30 seconds for all requests)
-app.use((req, res, next) => {
-  req.setTimeout(30000);
-  res.setTimeout(30000);
-  next();
-});
-
-// Rate limiting middleware
 app.use(
   rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 120, // max 120 requests per minute
+    windowMs: 60 * 1000,
+    max: 120,
     standardHeaders: true,
     legacyHeaders: false,
-    message: "Too many requests from this IP, please try again later.",
   })
 );
 
-// Health check routes
 app.get("/", (req, res) => {
-  res.status(200).json({ success: true, message: "Server is running" });
+  res.send("Server running");
 });
 
 app.get("/health", (req, res) => {
-  const health = {
-    success: true,
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-  };
-  res.status(200).json(health);
+  res.json({ success: true, data: { status: "ok" } });
 });
 
 // Prevent noisy 404s for browser favicon requests
@@ -121,62 +89,23 @@ app.use("/api/notifications", notificationRoutes);
 app.use(errorHandler);
 
 const startServer = async () => {
-  let server;
   try {
     console.log("[startup] Starting backend server...");
-    console.log(`[startup] Environment: ${env.NODE_ENV}`);
     console.log("[startup] Connecting to MongoDB...");
-    
     await connectDB();
     console.log("[startup] MongoDB connection successful");
 
-    server = app.listen(PORT, () => {
-      console.log(`[startup] ✓ Backend running on port ${PORT}`);
-      console.log(`[startup] Server ready to accept requests`);
+    const server = app.listen(PORT, () => {
+      console.log(`[startup] Backend running on port ${PORT}`);
     });
 
-    // Handle server errors
     server.on("error", (error) => {
-      if (error.code === "EADDRINUSE") {
-        console.error(`[startup] ✗ Port ${PORT} is already in use`);
-      } else {
-        console.error("[startup] ✗ Server error:", error);
-      }
+      console.error("[startup] Server failed to start:", error);
+      process.exit(1);
     });
-
-    // Graceful shutdown on SIGTERM
-    process.on("SIGTERM", () => {
-      console.log("[shutdown] SIGTERM received, closing gracefully...");
-      server.close(() => {
-        console.log("[shutdown] ✓ HTTP server closed");
-        process.exit(0);
-      });
-      
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        console.error("[shutdown] Forced shutdown after timeout");
-        process.exit(1);
-      }, 10000);
-    });
-
-    // Graceful shutdown on SIGINT
-    process.on("SIGINT", () => {
-      console.log("[shutdown] SIGINT received, closing gracefully...");
-      server.close(() => {
-        console.log("[shutdown] ✓ HTTP server closed");
-        process.exit(0);
-      });
-      
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        console.error("[shutdown] Forced shutdown after timeout");
-        process.exit(1);
-      }, 10000);
-    });
-
   } catch (error) {
-    console.error("[startup] ✗ Critical startup failure:", error.message || error);
-    console.error("[startup] Server cannot start without MongoDB connection");
+    console.error("[startup] Critical startup failure:", error);
+    console.error("[startup] Server cannot start without MongoDB connection. Exiting...");
     process.exit(1);
   }
 };
