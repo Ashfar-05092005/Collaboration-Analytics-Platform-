@@ -91,7 +91,9 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     console.log("[startup] Starting backend server...");
+    console.log("[startup] Connecting to MongoDB...");
     await connectDB();
+    console.log("[startup] MongoDB connection successful");
 
     const server = app.listen(PORT, () => {
       console.log(`[startup] Backend running on port ${PORT}`);
@@ -99,9 +101,12 @@ const startServer = async () => {
 
     server.on("error", (error) => {
       console.error("[startup] Server failed to start:", error);
+      process.exit(1);
     });
   } catch (error) {
     console.error("[startup] Critical startup failure:", error);
+    console.error("[startup] Server cannot start without MongoDB connection. Exiting...");
+    process.exit(1);
   }
 };
 
