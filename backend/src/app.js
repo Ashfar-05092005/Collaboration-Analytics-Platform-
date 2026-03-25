@@ -24,6 +24,10 @@ const PORT = process.env.PORT || 5000;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, "").toLowerCase();
+const allowedOrigins = String(process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => normalizeOrigin(origin))
+  .filter(Boolean);
 
 process.on("uncaughtException", (err) => console.error("Uncaught Exception:", err));
 process.on("unhandledRejection", (err) => console.error("Unhandled Rejection:", err));
@@ -34,13 +38,12 @@ app.use(helmet());
 app.use(compression({ level: 6, threshold: 1024 }));
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      const allowedOrigins = Array.isArray(env.CORS_ORIGIN) ? env.CORS_ORIGIN : [env.CORS_ORIGIN];
-      if (allowedOrigins.includes(normalizeOrigin(origin))) {
-        return callback(null, true);
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
       }
-      return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
