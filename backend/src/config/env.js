@@ -6,11 +6,8 @@ const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, 
 
 const parseCorsOrigins = (value) => {
   const defaults = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:5173",
-    "https://collaboration-analytics-platform-frontend.onrender.com",
-  ].map(normalizeOrigin);
+    process.env.CORS_ORIGIN || "http://localhost:5173",
+  ];
   if (!value) return defaults;
 
   const origins = String(value)
