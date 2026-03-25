@@ -1,121 +1,86 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Typography, Paper, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { fetchIssues, fetchProjects, fetchTasks, fetchUsers } from '../services/api';
+import { fetchAnalyticsDashboard } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useLocation } from 'react-router-dom';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 const COLORS = ['#4CAF50', '#FF9800', '#F44336', '#2196F3'];
 
-const buildTaskCompletionRate = (tasks) => {
-  const now = new Date();
-  const months = [
-    new Date(now.getFullYear(), now.getMonth() - 1, 1),
-    new Date(now.getFullYear(), now.getMonth(), 1),
-  ];
-
-  return months.map((monthDate) => {
-    const label = monthDate.toLocaleString('en-US', { month: 'short' });
-    const month = monthDate.getMonth();
-    const year = monthDate.getFullYear();
-    const monthTasks = tasks.filter((task) => {
-      if (!task.createdAt) return false;
-      const created = new Date(task.createdAt);
-      return created.getMonth() === month && created.getFullYear() === year;
-    });
-    const completed = monthTasks.filter((task) => task.status === 'completed').length;
-    return { month: label, completed, total: monthTasks.length };
-  });
-};
-
-const buildProjectStatusData = (projects) => {
-  const counts = projects.reduce((acc, project) => {
-    const status = project.status || 'unknown';
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {});
-  return Object.entries(counts).map(([name, value]) => ({ name, value }));
-};
-
-const buildTasksByPriority = (tasks) => {
-  const priorities = ['high', 'medium', 'low'];
-  return priorities.map((priority) => ({
-    priority: priority.charAt(0).toUpperCase() + priority.slice(1),
-    count: tasks.filter((task) => task.priority === priority).length,
-  }));
-};
-
-const buildTeamPerformance = (tasks, users) => {
-  const userMap = new Map(users.map((user) => [String(user.id || user._id), user]));
-  const grouped = tasks.reduce((acc, task) => {
-    const userId = String(task.assignedTo && task.assignedTo._id ? task.assignedTo._id : task.assignedTo || '');
-    if (!userId) return acc;
-    if (!acc[userId]) {
-      acc[userId] = { tasksCompleted: 0, tasksInProgress: 0, tasksTotal: 0 };
-    }
-    acc[userId].tasksTotal += 1;
-    if (task.status === 'completed') acc[userId].tasksCompleted += 1;
-    if (['on_review', 'submitted', 'changes_requested', 'assigned'].includes(task.status)) {
-      acc[userId].tasksInProgress += 1;
-    }
-    return acc;
-  }, {});
-
-  return Object.entries(grouped).map(([userId, stats]) => {
-    const user = userMap.get(userId);
-    const score = stats.tasksTotal > 0 ? Math.round((stats.tasksCompleted / stats.tasksTotal) * 100) : 0;
-    return {
-      userId,
-      userName: user?.name || 'Unknown',
-      tasksCompleted: stats.tasksCompleted,
-      tasksInProgress: stats.tasksInProgress,
-      contributionScore: score,
-    };
-  });
+const EMPTY_DASHBOARD = {
+  teamContribution: [],
+  teamPerformance: [],
+  tasksByPriority: [
+    { priority: 'Critical', count: 0 },
+    { priority: 'High', count: 0 },
+    { priority: 'Medium', count: 0 },
+    { priority: 'Low', count: 0 },
+  ],
+  issueStats: {
+    total: 0,
+    open: 0,
+    inReview: 0,
+    escalated: 0,
+    resolved: 0,
+    resolutionRate: 0,
+  },
+  memberPerformance: [],
+  taskCompletionRate: [],
+  projectStatus: [],
 };
 
 export function Analytics() {
   const { user } = useAuth();
   const location = useLocation();
 
-  const [tasks, setTasks] = useState([]);
-  const [issues, setIssues] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [dashboard, setDashboard] = useState(EMPTY_DASHBOARD);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let isMounted = true;
+
     const loadData = async () => {
+      setLoading(true);
+      setError('');
+
       try {
-        const [tasksData, issuesData, projectsData, usersData] = await Promise.all([
-          fetchTasks({ page: 1, limit: 500 }),
-          fetchIssues(user?.role === 'teamLeader'
-            ? { forTeamLeader: 'true', page: 1, limit: 500 }
-            : { page: 1, limit: 500 }
-          ),
-          fetchProjects({ page: 1, limit: 200 }),
-          fetchUsers({ page: 1, limit: 500 }),
-        ]);
+        const response = await fetchAnalyticsDashboard();
+        console.log('[analytics] dashboard response', response);
+
         if (!isMounted) return;
-        const normalizedUsers = (usersData || []).map((userItem) => ({
-          ...userItem,
-          id: userItem.id || userItem._id,
-        }));
-        setTasks(tasksData || []);
-        setIssues(issuesData || []);
-        setProjects(projectsData || []);
-        setUsers(normalizedUsers);
-      } catch {
+
+        setDashboard({
+          ...EMPTY_DASHBOARD,
+          ...response,
+          teamContribution: Array.isArray(response?.teamContribution) ? response.teamContribution : [],
+          teamPerformance: Array.isArray(response?.teamPerformance) ? response.teamPerformance : [],
+          tasksByPriority: Array.isArray(response?.tasksByPriority)
+            ? response.tasksByPriority
+            : EMPTY_DASHBOARD.tasksByPriority,
+          issueStats: {
+            ...EMPTY_DASHBOARD.issueStats,
+            ...(response?.issueStats || {}),
+          },
+          memberPerformance: Array.isArray(response?.memberPerformance) ? response.memberPerformance : [],
+          taskCompletionRate: Array.isArray(response?.taskCompletionRate) ? response.taskCompletionRate : [],
+          projectStatus: Array.isArray(response?.projectStatus) ? response.projectStatus : [],
+        });
+      } catch (err) {
+        console.error('[analytics] failed to load dashboard', err);
         if (!isMounted) return;
-        setTasks([]);
-        setIssues([]);
-        setProjects([]);
-        setUsers([]);
+        setDashboard(EMPTY_DASHBOARD);
+        setError(err?.message || 'Failed to load analytics data');
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
     if (user?.role) {
       loadData();
+    } else if (isMounted) {
+      setLoading(false);
     }
 
     return () => {
@@ -123,53 +88,59 @@ export function Analytics() {
     };
   }, [user?.role]);
 
-  const filteredTasks = tasks;
-  const filteredIssues = issues;
-  const filteredTeamPerformance = useMemo(
-    () => buildTeamPerformance(filteredTasks, users),
-    [filteredTasks, users]
-  );
-
   const taskCompletionRate = useMemo(
-    () => buildTaskCompletionRate(filteredTasks),
-    [filteredTasks]
+    () => (Array.isArray(dashboard.taskCompletionRate) ? dashboard.taskCompletionRate : []),
+    [dashboard.taskCompletionRate]
   );
+
   const projectStatus = useMemo(
-    () => buildProjectStatusData(projects),
-    [projects]
+    () => (Array.isArray(dashboard.projectStatus) ? dashboard.projectStatus : []),
+    [dashboard.projectStatus]
   );
+
+  const teamMemberPerformanceData = useMemo(
+    () => (Array.isArray(dashboard.memberPerformance) ? dashboard.memberPerformance : []),
+    [dashboard.memberPerformance]
+  );
+
+  const teamPerformance = useMemo(
+    () => (Array.isArray(dashboard.teamPerformance) ? dashboard.teamPerformance : []),
+    [dashboard.teamPerformance]
+  );
+
   const tasksByPriority = useMemo(
-    () => buildTasksByPriority(filteredTasks),
-    [filteredTasks]
+    () => (Array.isArray(dashboard.tasksByPriority) ? dashboard.tasksByPriority : EMPTY_DASHBOARD.tasksByPriority),
+    [dashboard.tasksByPriority]
   );
 
-  // Calculate team member performance data
-  const teamMemberPerformanceData = filteredTeamPerformance.map((member) => ({
-    name: member.userName.split(' ')[0],
-    completed: member.tasksCompleted,
-    inProgress: member.tasksInProgress,
-    score: member.contributionScore,
-  }));
-
-  // Calculate issue statistics
   const issueStats = {
-    total: filteredIssues.length,
-    open: filteredIssues.filter((issue) => issue.status === 'open').length,
-    inReview: filteredIssues.filter((issue) => issue.status === 'in-review').length,
-    escalated: filteredIssues.filter((issue) => issue.status === 'escalated').length,
-    resolved: filteredIssues.filter((issue) => issue.status === 'resolved').length,
+    ...EMPTY_DASHBOARD.issueStats,
+    ...(dashboard.issueStats || {}),
   };
+
+  const allContributionScoresZero =
+    teamMemberPerformanceData.length > 0 && teamMemberPerformanceData.every((member) => Number(member?.score || 0) === 0);
 
   const deletedProjectName =
     user?.role === 'admin' && location.state?.fromNotificationType === 'project_deleted'
       ? location.state?.highlightDeletedProject
       : '';
 
+  if (loading) {
+    return <LoadingSpinner message="Loading analytics dashboard..." />;
+  }
+
   return (
     <Box>
       <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: 600 }}>
         Analytics Dashboard {user?.role === 'teamLeader' && '- My Team'}
       </Typography>
+
+      {error ? (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      ) : null}
 
       {deletedProjectName ? (
         <Alert severity="warning" sx={{ mb: 3 }}>
@@ -252,16 +223,29 @@ export function Analytics() {
             <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
               Team Contribution Score
             </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={teamMemberPerformanceData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 100]} />
-                <YAxis dataKey="name" type="category" />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="score" fill="#2196F3" name="Contribution Score" />
-              </BarChart>
-            </ResponsiveContainer>
+            {teamMemberPerformanceData.length === 0 ? (
+              <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography color="text.secondary">No team member data available.</Typography>
+              </Box>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={teamMemberPerformanceData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" domain={[0, 100]} />
+                    <YAxis dataKey="name" type="category" />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="score" fill="#2196F3" name="Contribution Score" minPointSize={3} />
+                  </BarChart>
+                </ResponsiveContainer>
+                {allContributionScoresZero ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Scores are currently 0% because no tasks are marked completed yet.
+                  </Typography>
+                ) : null}
+              </>
+            )}
           </Paper>
         </Grid>
 
@@ -283,7 +267,13 @@ export function Analytics() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredTeamPerformance.map((member) => {
+                  {teamPerformance.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        No team performance data available.
+                      </TableCell>
+                    </TableRow>
+                  ) : teamPerformance.map((member) => {
                     const rating = member.contributionScore >= 90 ? 'Excellent' : 
                                    member.contributionScore >= 80 ? 'Good' : 
                                    member.contributionScore >= 70 ? 'Average' : 'Needs Improvement';
@@ -293,10 +283,10 @@ export function Analytics() {
 
                     return (
                       <TableRow key={member.userId} hover>
-                        <TableCell>{member.userName}</TableCell>
-                        <TableCell align="right">{member.tasksCompleted}</TableCell>
-                        <TableCell align="right">{member.tasksInProgress}</TableCell>
-                        <TableCell align="right">{member.contributionScore}%</TableCell>
+                        <TableCell>{member.userName || 'Unknown'}</TableCell>
+                        <TableCell align="right">{member.tasksCompleted || 0}</TableCell>
+                        <TableCell align="right">{member.tasksInProgress || 0}</TableCell>
+                        <TableCell align="right">{member.contributionScore || 0}%</TableCell>
                         <TableCell align="right">
                           <Typography sx={{ color: ratingColor, fontWeight: 600 }}>
                             {rating}
@@ -371,7 +361,7 @@ export function Analytics() {
               <Grid size={{ xs: 6, sm: 4 }}>
                 <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#F5F7FA', borderRadius: 2 }}>
                   <Typography variant="h3" sx={{ fontWeight: 600, color: '#9C27B0' }}>
-                    {issueStats.total > 0 ? Math.round((issueStats.resolved / issueStats.total) * 100) : 0}%
+                    {issueStats.resolutionRate || 0}%
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                     Resolution Rate

@@ -29,9 +29,13 @@ Frontend and backend startup scripts now run an automatic version check and will
 Frontend:
 - `cd frontend`
 - `npm i`
+- Set `REACT_APP_API_URL` in `frontend/.env` (for deployed API use your backend base URL)
 - `npm start`
 
 Backend:
 - `cd backend`
 - `npm i`
 - `npm run dev`
+
+Analytics API:
+- `GET /api/analytics/dashboard`

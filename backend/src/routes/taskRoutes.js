@@ -1,6 +1,7 @@
 const express = require("express");
 const { body } = require("express-validator");
 const { Task } = require("../models/Task");
+const { Project } = require("../models/Project");
 const { Notification } = require("../models/Notification");
 const { ActivityLog } = require("../models/ActivityLog");
 const { asyncHandler } = require("../asyncHandler");
@@ -88,7 +89,23 @@ const listTasks = asyncHandler(async (req, res) => {
 	if (req.user.role === "teamMember") {
 		filter.assignedTo = req.user._id;
 	} else if (req.user.role === "teamLeader") {
-		filter.createdBy = req.user._id;
+		const leaderProjects = await Project.find({ teamLeader: req.user._id }).select("_id").lean();
+		const leaderProjectIds = leaderProjects.map((project) => String(project._id));
+
+		if (leaderProjectIds.length === 0) {
+			const { page, limit } = parsePagination(req.query);
+			return success(res, { items: [], page, limit, total: 0 });
+		}
+
+		if (projectId) {
+			if (!leaderProjectIds.includes(String(projectId))) {
+				const { page, limit } = parsePagination(req.query);
+				return success(res, { items: [], page, limit, total: 0 });
+			}
+			filter.projectId = projectId;
+		} else {
+			filter.projectId = { $in: leaderProjectIds };
+		}
 	}
 
 	const { page, limit, skip } = parsePagination(req.query);

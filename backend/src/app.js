@@ -19,6 +19,8 @@ const { errorHandler } = require("./middlewares/error");
 
 const app = express();
 
+const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, "").toLowerCase();
+
 app.set("trust proxy", 1);
 
 connectDB();
@@ -27,14 +29,19 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
+      if (env.NODE_ENV !== "production") return callback(null, true);
       if (!origin) return callback(null, true);
+      const normalizedOrigin = normalizeOrigin(origin);
       const allowedOrigins = Array.isArray(env.CORS_ORIGIN) ? env.CORS_ORIGIN : [env.CORS_ORIGIN];
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(normalizedOrigin)) {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
   })
 );
 app.use(express.json({ limit: "1mb" }));

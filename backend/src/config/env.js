@@ -2,16 +2,26 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
+const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, "").toLowerCase();
+
 const parseCorsOrigins = (value) => {
-  const defaults = ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"];
+  const defaults = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:5173",
+    "https://collaboration-analytics-platform-frontend.onrender.com",
+  ].map(normalizeOrigin);
   if (!value) return defaults;
 
   const origins = String(value)
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) => normalizeOrigin(origin))
     .filter(Boolean);
 
-  return origins.length ? origins : defaults;
+  return origins.length ? Array.from(new Set([...defaults, ...origins])) : defaults;
 };
 
 const env = {

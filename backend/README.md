@@ -46,5 +46,6 @@
 - `GET /api/analytics/summary`
 - `GET /api/analytics/team-productivity`
 - `GET /api/analytics/project-progress`
+- `GET /api/analytics/dashboard`
 
 - `GET /api/activity`
