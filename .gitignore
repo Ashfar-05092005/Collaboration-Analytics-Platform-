@@ -2,13 +2,16 @@
 node_modules/
 package-lock.json
 yarn.lock
+backend/node_modules/
+frontend/node_modules/
 
-# Environment variables
+# Environment files
 .env
-.env.local
-.env.*.local
+.env.*
+backend/.env
+frontend/.env
 
-# IDE
+# Editor/IDE
 .vscode/
 .idea/
 *.swp
@@ -21,6 +24,7 @@ Thumbs.db
 
 # Build
 build/
+frontend/build/
 dist/
 coverage/
 
@@ -28,3 +32,4 @@ coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
