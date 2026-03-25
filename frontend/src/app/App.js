@@ -97,6 +97,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
+                <Route index element={<Navigate to="/dashboard" replace />} />
                 {/* Dashboard - Role-based redirect */}
                 <Route path="dashboard" element={<DashboardRouter />} />
 
@@ -202,8 +203,8 @@ export default function App() {
                   }
                 />
 
-                {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                {/* Default redirect for root */}
+                <Route index element={<Navigate to="/dashboard" replace />} />
               </Route>
 
               {/* Catch all - redirect to login */}
