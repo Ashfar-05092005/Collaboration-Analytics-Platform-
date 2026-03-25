@@ -10,6 +10,9 @@ frontend/node_modules/
 .env.*
 backend/.env
 frontend/.env
+!backend/.env.example
+!frontend/.env.production
+!frontend/.env.development
 
 # Editor/IDE
 .vscode/

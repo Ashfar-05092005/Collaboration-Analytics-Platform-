@@ -1,5 +1,4 @@
-
-const API_BASE = String(process.env.REACT_APP_API_URL || DEPLOYED_API_URL).trim().replace(/\/+$/, "");
+const BASE_URL = String(process.env.REACT_APP_API_URL || "http://localhost:5000").trim().replace(/\/+$/, "");
 
 const refreshAccessToken = async () => {
   const refreshToken = localStorage.getItem("refreshToken");
@@ -7,7 +6,7 @@ const refreshAccessToken = async () => {
     throw new Error("Session expired");
   }
 
-  const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+  const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -26,7 +25,7 @@ const refreshAccessToken = async () => {
 
 const request = async (path, options = {}, retry = true) => {
   const token = localStorage.getItem("accessToken");
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
