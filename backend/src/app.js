@@ -4,8 +4,8 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const compression = require("compression");
-const { connectDB } = require("./config/db");
 const { env } = require("./config/env");
+const mongoose = require("mongoose");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const teamRoutes = require("./routes/teamRoutes");
@@ -18,19 +18,7 @@ const pointsRoutes = require("./routes/pointsRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const { errorHandler } = require("./middlewares/error");
 
-// Global error handlers
-process.on("uncaughtException", (err) => {
-  console.error("[process] Uncaught Exception:", err);
-  // Continue running - don't exit unless critical
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[process] Unhandled Rejection at:", promise, "reason:", reason);
-  // Continue running - don't exit unless critical
-});
-
 const app = express();
-const PORT = process.env.PORT || 5000;
 
 const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, "").toLowerCase();
 
@@ -108,6 +96,16 @@ app.get("/favicon.ico", (req, res) => {
   res.status(204).end();
 });
 
+app.use("/api", (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: "Database unavailable. Please retry shortly.",
+    });
+  }
+  return next();
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/teams", teamRoutes);
@@ -120,66 +118,5 @@ app.use("/api/points", pointsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use(errorHandler);
 
-const startServer = async () => {
-  let server;
-  try {
-    console.log("[startup] Starting backend server...");
-    console.log(`[startup] Environment: ${env.NODE_ENV}`);
-    console.log("[startup] Connecting to MongoDB...");
-    
-    await connectDB();
-    console.log("[startup] MongoDB connection successful");
-
-    server = app.listen(PORT, () => {
-      console.log(`[startup] ✓ Backend running on port ${PORT}`);
-      console.log(`[startup] Server ready to accept requests`);
-    });
-
-    // Handle server errors
-    server.on("error", (error) => {
-      if (error.code === "EADDRINUSE") {
-        console.error(`[startup] ✗ Port ${PORT} is already in use`);
-      } else {
-        console.error("[startup] ✗ Server error:", error);
-      }
-    });
-
-    // Graceful shutdown on SIGTERM
-    process.on("SIGTERM", () => {
-      console.log("[shutdown] SIGTERM received, closing gracefully...");
-      server.close(() => {
-        console.log("[shutdown] ✓ HTTP server closed");
-        process.exit(0);
-      });
-      
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        console.error("[shutdown] Forced shutdown after timeout");
-        process.exit(1);
-      }, 10000);
-    });
-
-    // Graceful shutdown on SIGINT
-    process.on("SIGINT", () => {
-      console.log("[shutdown] SIGINT received, closing gracefully...");
-      server.close(() => {
-        console.log("[shutdown] ✓ HTTP server closed");
-        process.exit(0);
-      });
-      
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        console.error("[shutdown] Forced shutdown after timeout");
-        process.exit(1);
-      }, 10000);
-    });
-
-  } catch (error) {
-    console.error("[startup] ✗ Critical startup failure:", error.message || error);
-    console.error("[startup] Server cannot start without MongoDB connection");
-    process.exit(1);
-  }
-};
-
-startServer();
+module.exports = { app, env };
 

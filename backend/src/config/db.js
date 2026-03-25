@@ -1,62 +1,83 @@
 const mongoose = require("mongoose");
 
-// Disable mongoose buffering to prevent timeout issues
 mongoose.set("bufferCommands", false);
 
-// Add connection event listeners for debugging
-mongoose.connection.on("connected", () => {
-  console.log("[db] ✓ Connected to MongoDB");
+const MAX_RETRIES = Number(process.env.MONGO_MAX_RETRIES || 5);
+const BASE_RETRY_DELAY_MS = Number(process.env.MONGO_RETRY_DELAY_MS || 2000);
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let listenersAttached = false;
+
+const attachConnectionListeners = () => {
+  if (listenersAttached) return;
+
+  mongoose.connection.on("connected", () => {
+    console.log("[db] Connected to MongoDB");
+  });
+
+  mongoose.connection.on("error", (err) => {
+    console.error("[db] MongoDB error:", err.message || err);
+  });
+
+  mongoose.connection.on("disconnected", () => {
+    console.warn("[db] MongoDB disconnected");
+  });
+
+  listenersAttached = true;
+};
+
+const getMongooseOptions = () => ({
+  maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE || 20),
+  minPoolSize: Number(process.env.MONGO_MIN_POOL_SIZE || 5),
+  serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 10000),
+  connectTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 10000),
+  socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS || 45000),
+  heartbeatFrequencyMS: Number(process.env.MONGO_HEARTBEAT_FREQUENCY_MS || 10000),
+  retryWrites: true,
 });
 
-mongoose.connection.on("error", (err) => {
-  console.error("[db] Connection error:", err.message || err);
-});
-
-mongoose.connection.on("disconnected", () => {
-  console.log("[db] Disconnected from MongoDB");
-});
-
-// Connection retry configuration
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000; // 2 seconds
-
-const connectDB = async (attempt = 1) => {
+const connectDB = async () => {
   const mongoUri = process.env.MONGO_URI;
 
   if (!mongoUri) {
-    throw new Error("[db] MONGO_URI environment variable is not set. Cannot proceed.");
+    throw new Error("[db] MONGO_URI is missing.");
   }
 
-  try {
-    console.log(`[db] Attempting to connect to MongoDB (attempt ${attempt}/${MAX_RETRIES})...`);
-    
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-      maxPoolSize: 10,
-      minPoolSize: 5,
-      retryWrites: true,
-      w: "majority",
-    });
-    
-    console.log("[db] ✓ MongoDB connected successfully");
-    return mongoose.connection;
-  } catch (error) {
-    console.error(`[db] Connection attempt ${attempt} failed:`, error.message || error);
-    
-    if (attempt < MAX_RETRIES) {
-      console.log(`[db] Retrying in ${RETRY_DELAY}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-      return connectDB(attempt + 1);
+  attachConnectionListeners();
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      console.log(`[db] Connecting to MongoDB (attempt ${attempt}/${MAX_RETRIES})`);
+
+      await mongoose.connect(mongoUri, getMongooseOptions());
+
+      console.log("[db] MongoDB connection established");
+      return mongoose.connection;
+    } catch (error) {
+      const isLastAttempt = attempt === MAX_RETRIES;
+      console.error(`[db] Connection attempt ${attempt} failed:`, error.message || error);
+
+      if (isLastAttempt) {
+        console.error("[db] Exhausted MongoDB connection retries");
+        throw error;
+      }
+
+      const backoffMs = BASE_RETRY_DELAY_MS * 2 ** (attempt - 1);
+      console.log(`[db] Retrying in ${backoffMs}ms`);
+      await wait(backoffMs);
     }
-    
-    console.error("[db] ✗ All connection attempts failed");
-    throw error;
+  }
+
+  throw new Error("[db] Unexpected MongoDB connection flow error.");
+};
+
+const disconnectDB = async () => {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+    console.log("[db] MongoDB connection closed");
   }
 };
 
-module.exports = { connectDB };
+module.exports = { connectDB, disconnectDB };
 
