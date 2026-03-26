@@ -21,6 +21,7 @@ const { errorHandler } = require("./middlewares/error");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const HOST = "0.0.0.0";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const normalizeOrigin = (origin) => {
@@ -39,7 +40,7 @@ const normalizeOrigin = (origin) => {
 };
 
 const allowedOrigins = Array.from(
-  new Set([...env.CORS_ORIGIN, normalizeOrigin(process.env.FRONTEND_URL)].filter(Boolean))
+  new Set([...env.CORS_ORIGIN, ...env.CLIENT_URL, normalizeOrigin(process.env.FRONTEND_URL)].filter(Boolean))
 );
 
 process.on("uncaughtException", (err) => console.error("Uncaught Exception:", err));
@@ -114,30 +115,33 @@ app.use("/api/notifications", notificationRoutes);
 app.use(errorHandler);
 
 const startServer = async () => {
-  try {
-    const missingEnv = validateRequiredEnv();
-    if (missingEnv.length) {
-      throw new Error(`Missing required environment variables: ${missingEnv.join(", ")}`);
-    }
+  const missingEnv = validateRequiredEnv();
+  if (missingEnv.length) {
+    console.error(`[env] Missing required environment variables: ${missingEnv.join(", ")}`);
+  }
 
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+
+  server.on("error", (error) => {
+    console.error("[startup] Server listen error:", error.message || error);
+  });
+
+  try {
     let dbConnected = await connectDB();
     while (!dbConnected) {
-      console.warn("[startup] Waiting for MongoDB before starting HTTP server...");
+      console.warn("[startup] MongoDB not ready, retrying in 5000ms...");
       await wait(5000);
       dbConnected = await connectDB();
     }
-
-    const server = app.listen(PORT, () => {
-      console.log(`[startup] Server started on port ${PORT}`);
-    });
-
-    server.on("error", (error) => {
-      console.error("[startup] Server listen error:", error.message || error);
-    });
+    console.log("[startup] MongoDB ready.");
   } catch (error) {
-    console.error("[startup] Critical startup failure:", error.message || error);
+    console.error("[startup] MongoDB startup error:", error.message || error);
   }
+
+  return server;
 };
 
-startServer();
+module.exports = { app, startServer };
 

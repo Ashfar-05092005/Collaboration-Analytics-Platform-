@@ -5,10 +5,11 @@
   "engines": {
     "node": "20.x"
   },
-  "main": "src/app.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "start": "node server.js",
+    "build": "echo \"No build required\"",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "bcryptjs": "2.4.3",
