@@ -2,12 +2,30 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-const normalizeOrigin = (origin) => String(origin || "").trim().replace(/\/+$/, "").toLowerCase();
+const normalizeOrigin = (origin) => {
+  const raw = String(origin || "").trim();
+  if (!raw) return "";
+
+  try {
+    // Normalize full URLs (including accidental paths like /login) to bare origin.
+    if (/^https?:\/\//i.test(raw)) {
+      return new URL(raw).origin.toLowerCase();
+    }
+  } catch {
+    // Fall through to basic normalization for non-URL values.
+  }
+
+  return raw.replace(/\/+$/, "").toLowerCase();
+};
 
 const parseCorsOrigins = (value) => {
   const defaults = [
-    process.env.CORS_ORIGIN || "http://localhost:5173",
-  ];
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:5173",
+    "https://cap-ashfar-2025.netlify.app",
+    "https://mcoll.netlify.app",
+  ].map(normalizeOrigin);
   if (!value) return defaults;
 
   const origins = String(value)

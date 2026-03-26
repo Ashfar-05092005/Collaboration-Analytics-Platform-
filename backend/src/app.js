@@ -23,16 +23,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const normalizeOrigin = (origin) => {
+  const raw = String(origin || "").trim();
+  if (!raw) return "";
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://cap-ashfar-2025.netlify.app",
-  process.env.FRONTEND_URL,
-  ...String(process.env.CORS_ORIGIN || "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
-].filter(Boolean);
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      return new URL(raw).origin.toLowerCase();
+    }
+  } catch {
+    // Fall through to basic normalization for non-URL values.
+  }
+
+  return raw.replace(/\/+$/, "").toLowerCase();
+};
+
+const allowedOrigins = Array.from(
+  new Set([...env.CORS_ORIGIN, normalizeOrigin(process.env.FRONTEND_URL)].filter(Boolean))
+);
 
 process.on("uncaughtException", (err) => console.error("Uncaught Exception:", err));
 process.on("unhandledRejection", (err) => console.error("Unhandled Rejection:", err));
@@ -44,9 +52,12 @@ app.use(compression({ level: 6, threshold: 1024 }));
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (!origin || allowedOrigins.includes(normalizedOrigin)) {
         callback(null, true);
       } else {
+        console.warn(`[cors] Blocked origin: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },
