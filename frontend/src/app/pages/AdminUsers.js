@@ -37,7 +37,6 @@ export function AdminUsers() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [editRole, setEditRole] = useState('teamMember');
   const [editPoints, setEditPoints] = useState(0);
-    // const [pointsOp, setPointsOp] = useState('set');
   const [activeRoleTab, setActiveRoleTab] = useState(0);
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,7 +125,6 @@ export function AdminUsers() {
     setSelectedUser(user);
     setEditRole(user.role === 'admin' ? 'admin' : user.role);
     setEditPoints(user.points || 0);
-    // setPointsOp('set');
     setOpenEdit(true);
   };
 

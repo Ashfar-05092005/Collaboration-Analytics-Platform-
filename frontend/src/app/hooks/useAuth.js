@@ -28,10 +28,8 @@ export function AuthProvider({ children }) {
   const register = async (name, email, password, role) => {
     setIsLoading(true);
     try {
-      const user = await authRegister({ name, email, password, role });
-      // Don't auto-login after registration - user needs admin approval
-      // saveUser(user);
-      // setUser(user);
+      await authRegister({ name, email, password, role });
+      // Registration submitted - user needs admin approval before login
     } finally {
       setIsLoading(false);
     }
