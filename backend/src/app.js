@@ -80,7 +80,12 @@ app.use(
 app.get("/", (req, res) => res.send("Server running"));
 
 app.get("/health", (req, res) => {
-  res.json({ success: true, data: { status: "ok" } });
+  const dbReady = mongoose.connection.readyState === 1;
+  res.status(dbReady ? 200 : 503).json({
+    success: dbReady,
+    data: { status: dbReady ? "ok" : "degraded", dbReady },
+    message: dbReady ? "Service healthy" : "Database connection not ready",
+  });
 });
 
 // Prevent noisy 404s for browser favicon requests
@@ -99,6 +104,18 @@ app.param("memberId", (req, res, next, value) => {
   if (!mongoose.isValidObjectId(value)) {
     return res.status(400).json({ success: false, data: null, message: "Invalid memberId" });
   }
+  return next();
+});
+
+app.use("/api", (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      data: null,
+      message: "Database is not connected yet. Please retry in a few seconds.",
+    });
+  }
+
   return next();
 });
 
