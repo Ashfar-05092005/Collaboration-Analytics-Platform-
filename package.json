@@ -1,0 +1,10 @@
+{
+  "name": "collaboration-analytics-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "npm --prefix frontend run start",
+    "start:backend": "npm --prefix backend run start",
+    "build": "npm --prefix frontend run build"
+  }
+}
