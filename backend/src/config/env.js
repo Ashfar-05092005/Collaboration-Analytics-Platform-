@@ -26,6 +26,7 @@ const parseCorsOrigins = (value) => {
     "https://cap-ashfar-2025.netlify.app",
     "https://mcoll.netlify.app",
     "https://m2colla.netlify.app",
+    "https://collaboration-analytics-platform-xxt6.onrender.com",
   ].map(normalizeOrigin);
   if (!value) return defaults;
 
