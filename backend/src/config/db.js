@@ -8,6 +8,17 @@ let isConnecting = false;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const waitForReadyState = async (targetState, timeoutMs = 15000) => {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (mongoose.connection.readyState === targetState) {
+      return true;
+    }
+    await wait(200);
+  }
+  return false;
+};
+
 const attachHandlers = () => {
   if (handlersAttached) return;
 
@@ -44,8 +55,13 @@ const connectOnce = async () => {
     return false;
   }
 
-  if (mongoose.connection.readyState === 1 || isConnecting) {
+  if (mongoose.connection.readyState === 1) {
     return true;
+  }
+
+  if (isConnecting) {
+    // Another caller is connecting; wait until connection settles.
+    return waitForReadyState(1, Number(process.env.MONGO_CONNECT_WAIT_TIMEOUT_MS || 15000));
   }
 
   attachHandlers();

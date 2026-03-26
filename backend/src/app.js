@@ -115,7 +115,10 @@ app.use(errorHandler);
 
 const startServer = async () => {
   try {
-    validateRequiredEnv();
+    const missingEnv = validateRequiredEnv();
+    if (missingEnv.length) {
+      throw new Error(`Missing required environment variables: ${missingEnv.join(", ")}`);
+    }
 
     let dbConnected = await connectDB();
     while (!dbConnected) {
