@@ -43,6 +43,23 @@ const allowedOrigins = Array.from(
   new Set([...env.CORS_ORIGIN, ...env.CLIENT_URL, normalizeOrigin(process.env.FRONTEND_URL)].filter(Boolean))
 );
 
+const corsOptions = {
+  origin: function (origin, callback) {
+    const normalizedOrigin = normalizeOrigin(origin);
+
+    if (!origin || allowedOrigins.includes(normalizedOrigin)) {
+      callback(null, true);
+    } else {
+      console.warn(`[cors] Blocked origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
+};
+
 process.on("uncaughtException", (err) => console.error("Uncaught Exception:", err));
 process.on("unhandledRejection", (err) => console.error("Unhandled Rejection:", err));
 
@@ -50,21 +67,8 @@ app.set("trust proxy", 1);
 
 app.use(helmet());
 app.use(compression({ level: 6, threshold: 1024 }));
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      const normalizedOrigin = normalizeOrigin(origin);
-
-      if (!origin || allowedOrigins.includes(normalizedOrigin)) {
-        callback(null, true);
-      } else {
-        console.warn(`[cors] Blocked origin: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
